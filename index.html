@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EgyStors</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Tahoma, Arial, sans-serif; background: #f5f5f5; color: #222; }
+    header { background: #1a73e8; color: #fff; padding: 16px; display: flex; justify-content: space-between; align-items: center; }
+    header h1 { font-size: 24px; }
+    #cartBtn { background: #fff; color: #1a73e8; border: none; padding: 8px 14px; border-radius: 20px; font-size: 15px; font-weight: bold; cursor: pointer; }
+    main { max-width: 1100px; margin: 20px auto; padding: 0 12px; }
+    #products { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+    .card { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .card img { width: 100%; height: 180px; object-fit: cover; background: #ddd; }
+    .info { padding: 12px; }
+    .name { font-size: 17px; font-weight: bold; margin-bottom: 6px; }
+    .category { font-size: 13px; color: #777; margin-bottom: 6px; }
+    .price { font-size: 18px; color: #1a73e8; font-weight: bold; }
+    .stock { font-size: 13px; color: #555; margin: 4px 0 8px; }
+    .add { width: 100%; background: #1a73e8; color: #fff; border: none; padding: 10px; border-radius: 8px; font-size: 15px; cursor: pointer; }
+    .add:disabled { background: #aaa; }
+    #message { text-align: center; padding: 40px; font-size: 18px; color: #666; }
+    #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 10; }
+    #cartPanel { display: none; position: fixed; bottom: 0; left: 0; right: 0; max-height: 85vh; overflow-y: auto; background: #fff; border-radius: 16px 16px 0 0; padding: 16px; z-index: 11; }
+    #cartPanel h2 { margin-bottom: 12px; }
+    .item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; gap: 8px; }
+    .item .controls button { width: 28px; height: 28px; border: 1px solid #ccc; background: #fff; border-radius: 6px; font-size: 16px; cursor: pointer; }
+    .item .controls span { margin: 0 8px; }
+    #total { font-size: 18px; font-weight: bold; margin: 12px 0; }
+    #cartPanel input, #cartPanel textarea { width: 100%; padding: 10px; margin-bottom: 8px; border: 1px solid #ccc; border-radius: 8px; font-size: 15px; font-family: inherit; }
+    #orderBtn { width: 100%; background: #0b8043; color: #fff; border: none; padding: 12px; border-radius: 8px; font-size: 17px; cursor: pointer; }
+    #orderBtn:disabled { background: #aaa; }
+    #closeBtn { background: none; border: none; color: #777; font-size: 15px; margin-bottom: 8px; cursor: pointer; }
+    #status { margin-top: 10px; text-align: center; font-weight: bold; }
+    .wa { display: block; margin-top: 12px; background: #25d366; color: #fff; text-decoration: none; padding: 12px; border-radius: 8px; font-size: 17px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>EgyStors</h1>
+    <button id="cartBtn">السلة (<span id="count">0</span>)</button>
+  </header>
+
+  <main>
+    <div id="message">جاري تحميل المنتجات...</div>
+    <div id="products"></div>
+  </main>
+
+  <div id="overlay"></div>
+  <div id="cartPanel">
+    <button id="closeBtn">✕ إغلاق</button>
+    <h2>سلة المشتريات</h2>
+    <div id="cartItems"></div>
+    <div id="total"></div>
+    <input id="custName" placeholder="الاسم">
+    <input id="custPhone" placeholder="رقم التليفون" type="tel">
+    <textarea id="custAddress" rows="2" placeholder="العنوان"></textarea>
+    <button id="orderBtn">تأكيد الطلب</button>
+    <div id="status"></div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, getDocs, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const STORE_WHATSAPP = "201043691626";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCaGkv321YEbehXKN0su-Rj7tEcwZse75M",
+      authDomain: "egystors.firebaseapp.com",
+      projectId: "egystors",
+      storageBucket: "egystors.firebasestorage.app",
+      messagingSenderId: "392113217944",
+      appId: "1:392113217944:web:07f92ecc24e2c3bcb14bed"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const message = document.getElementById("message");
+    const grid = document.getElementById("products");
+    const countEl = document.getElementById("count");
+    const overlay = document.getElementById("overlay");
+    const panel = document.getElementById("cartPanel");
+    const cartItemsEl = document.getElementById("cartItems");
+    const totalEl = document.getElementById("total");
+    const statusEl = document.getElementById("status");
+    const orderBtn = document.getElementById("orderBtn");
+
+    const products = {};
+    let cart = JSON.parse(localStorage.getItem("egystors_cart") || "{}");
+
+    function saveCart() {
+      localStorage.setItem("egystors_cart", JSON.stringify(cart));
+      renderCart();
+    }
+
+    function escapeHtml(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+    }
+
+    function renderCart() {
+      const ids = Object.keys(cart).filter(id => products[id]);
+      let total = 0, count = 0;
+      cartItemsEl.innerHTML = "";
+      if (ids.length === 0) {
+        cartItemsEl.innerHTML = "<p>السلة فاضية</p>";
+      }
+      ids.forEach(id => {
+        const p = products[id];
+        const qty = cart[id];
+        total += (p.price || 0) * qty;
+        count += qty;
+        const row = document.createElement("div");
+        row.className = "item";
+        row.innerHTML = `
+          <div>${escapeHtml(p.name)}<br><small>${p.price || 0} ج.م</small></div>
+          <div class="controls">
+            <button data-act="dec" data-id="${id}">-</button>
+            <span>${qty}</span>
+            <button data-act="inc" data-id="${id}">+</button>
+          </div>`;
+        cartItemsEl.appendChild(row);
+      });
+      countEl.textContent = count;
+      totalEl.textContent = ids.length ? "الإجمالي: " + total + " ج.م" : "";
+      orderBtn.disabled = ids.length === 0;
+    }
+
+    cartItemsEl.addEventListener("click", (e) => {
+      const btn = e.target.closest("button");
+      if (!btn) return;
+      const id = btn.dataset.id;
+      if (btn.dataset.act === "inc") {
+        const max = products[id].stock ?? Infinity;
+        if (cart[id] < max) cart[id]++;
+      } else {
+        cart[id]--;
+        if (cart[id] <= 0) delete cart[id];
+      }
+      saveCart();
+    });
+
+    function openCart() { overlay.style.display = "block"; panel.style.display = "block"; statusEl.textContent = ""; renderCart(); }
+    function closeCart() { overlay.style.display = "none"; panel.style.display = "none"; }
+    document.getElementById("cartBtn").onclick = openCart;
+    document.getElementById("closeBtn").onclick = closeCart;
+    overlay.onclick = closeCart;
+
+    async function loadProducts() {
+      try {
+        const snapshot = await getDocs(collection(db, "Products"));
+        if (snapshot.empty) {
+          message.textContent = "مفيش منتجات دلوقتي";
+          return;
+        }
+        message.style.display = "none";
+        snapshot.forEach((d) => {
+          const p = d.data();
+          products[d.id] = p;
+          const card = document.createElement("div");
+          card.className = "card";
+          const out = p.stock !== undefined && p.stock <= 0;
+          card.innerHTML = `
+            <img src="${escapeHtml(p.imageUrl)}" alt="${escapeHtml(p.name)}">
+            <div class="info">
+              <div class="name">${escapeHtml(p.name || 'بدون اسم')}</div>
+              <div class="category">${escapeHtml(p.category)}</div>
+              <div class="price">${p.price !== undefined ? p.price + ' ج.م' : ''}</div>
+              <div class="stock">${p.stock !== undefined ? 'المتاح: ' + p.stock : ''}</div>
+              <button class="add" data-id="${d.id}" ${out ? 'disabled' : ''}>${out ? 'غير متاح' : 'أضف للسلة'}</button>
+            </div>`;
+          grid.appendChild(card);
+        });
+        renderCart();
+      } catch (err) {
+        message.textContent = "حصل خطأ في تحميل المنتجات";
+        console.error(err);
+      }
+    }
+
+    grid.addEventListener("click", (e) => {
+      const btn = e.target.closest(".add");
+      if (!btn) return;
+      const id = btn.dataset.id;
+      const max = products[id].stock ?? Infinity;
+      const cur = cart[id] || 0;
+      if (cur < max) cart[id] = cur + 1;
+      saveCart();
+      btn.textContent = "تمت الإضافة ✓";
+      setTimeout(() => btn.textContent = "أضف للسلة", 900);
+    });
+
+    function buildWhatsAppLink(name, phone, address, items, total) {
+      const lines = items.map(i => "- " + i.name + " × " + i.qty + " = " + (i.price * i.qty) + " ج.م");
+      const text =
+        "طلب جديد من EgyStors\n\n" +
+        "الاسم: " + name + "\n" +
+        "التليفون: " + phone + "\n" +
+        "العنوان: " + address + "\n\n" +
+        "المنتجات:\n" + lines.join("\n") + "\n\n" +
+        "الإجمالي: " + total + " ج.م";
+      return "https://wa.me/" + STORE_WHATSAPP + "?text=" + encodeURIComponent(text);
+    }
+
+    orderBtn.onclick = async () => {
+      const name = document.getElementById("custName").value.trim();
+      const phone = document.getElementById("custPhone").value.trim();
+      const address = document.getElementById("custAddress").value.trim();
+      if (!name || !phone || !address) {
+        statusEl.style.color = "#c00";
+        statusEl.textContent = "اكتب الاسم والتليفون والعنوان";
+        return;
+      }
+      const items = Object.keys(cart).filter(id => products[id]).map(id => ({
+        productId: id,
+        name: products[id].name || "",
+        price: products[id].price || 0,
+        qty: cart[id]
+      }));
+      if (items.length === 0) return;
+      const total = items.reduce((s, i) => s + i.price * i.qty, 0);
+
+      orderBtn.disabled = true;
+      statusEl.style.color = "#555";
+      statusEl.textContent = "جاري إرسال الطلب...";
+      try {
+        await addDoc(collection(db, "orders"), {
+          customerName: name,
+          phone: phone,
+          address: address,
+          items: items,
+          total: total,
+          status: "new",
+          createdAt: serverTimestamp()
+        });
+        const waLink = buildWhatsAppLink(name, phone, address, items, total);
+        cart = {};
+        saveCart();
+        statusEl.style.color = "#0b8043";
+        statusEl.innerHTML = "تم إرسال طلبك بنجاح ✓<br>دوس على الزرار تحت لإرسال تفاصيل الطلب على واتساب" +
+          '<a class="wa" href="' + waLink + '" target="_blank" rel="noopener">إرسال الطلب على واتساب</a>';
+        orderBtn.disabled = true;
+      } catch (err) {
+        console.error(err);
+        statusEl.style.color = "#c00";
+        statusEl.textContent = "حصل خطأ، حاول تاني";
+        orderBtn.disabled = false;
+      }
+    };
+
+    loadProducts();
+  </script>
+</body>
+</html>
