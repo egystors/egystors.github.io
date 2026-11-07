@@ -46,6 +46,18 @@ function esc(s) {
   });
 }
 
+// يقرأ اسم المنتج حتى لو الحقل مكتوب بمسافة زيادة ("name ")
+function pName(p) {
+  if (p.name) return p.name;
+  const k = Object.keys(p).find(function (key) { return key.trim() === "name"; });
+  return k ? p[k] : "";
+}
+
+// يقرأ الصورة من imageUrl أو image
+function pImage(p) {
+  return p.imageUrl || p.image || "";
+}
+
 function cartCount() {
   return Object.values(cart).reduce(function (a, b) { return a + b; }, 0);
 }
@@ -85,7 +97,7 @@ function renderProducts() {
   const ids = Object.keys(products).filter(function (id) {
     const p = products[id];
     if (activeCat !== "الكل" && p.category !== activeCat) return false;
-    if (q && String(p.name || "").toLowerCase().indexOf(q) === -1) return false;
+    if (q && String(pName(p)).toLowerCase().indexOf(q) === -1) return false;
     return true;
   });
   grid.innerHTML = "";
@@ -99,12 +111,13 @@ function renderProducts() {
     const p = products[id];
     const stock = Number(p.stock);
     const out = !isNaN(stock) && stock <= 0;
+    const img = pImage(p);
     const card = document.createElement("div");
     card.className = "card";
     card.innerHTML =
-      (p.image ? '<img src="' + esc(p.image) + '" alt="' + esc(p.name) + '">' : '<img alt="">') +
+      (img ? '<img src="' + esc(img) + '" alt="' + esc(pName(p)) + '">' : '<img alt="">') +
       '<div class="info">' +
-      '<div class="name">' + esc(p.name) + '</div>' +
+      '<div class="name">' + esc(pName(p)) + '</div>' +
       '<div class="category">' + esc(p.category) + '</div>' +
       '<div class="price">' + esc(p.price) + ' جنيه</div>' +
       '<div class="stock">' + (out ? "غير متوفر" : (isNaN(stock) ? "" : "المتاح: " + stock)) + '</div>' +
@@ -150,7 +163,7 @@ function renderCart() {
     const row = document.createElement("div");
     row.className = "item";
     row.innerHTML =
-      '<div>' + esc(p.name) + '<br><small>' + esc(p.price) + ' جنيه</small></div>' +
+      '<div>' + esc(pName(p)) + '<br><small>' + esc(p.price) + ' جنيه</small></div>' +
       '<div class="controls"><button class="minus">-</button><span>' + cart[id] + '</span><button class="plus">+</button></div>';
     row.querySelector(".minus").onclick = function () { changeQty(id, -1); };
     row.querySelector(".plus").onclick = function () { changeQty(id, 1); };
@@ -169,16 +182,21 @@ overlay.onclick = closeCart;
 searchEl.oninput = renderProducts;
 
 orderBtn.onclick = async function () {
-  const name = document.getElementById("custName").value.trim();
+  const customerName = document.getElementById("custName").value.trim();
   const phone = document.getElementById("custPhone").value.trim();
   const address = document.getElementById("custAddress").value.trim();
-  if (!name || !phone || !address) {
+  if (!customerName || !phone || !address) {
     statusEl.style.color = "#c0392b";
     statusEl.textContent = "من فضلك اكتب الاسم والتليفون والعنوان.";
     return;
   }
+  if (phone.length <= 5) {
+    statusEl.style.color = "#c0392b";
+    statusEl.textContent = "رقم التليفون مش كامل.";
+    return;
+  }
   const items = Object.keys(cart).map(function (id) {
-    return { id: id, name: products[id].name, price: Number(products[id].price) || 0, qty: cart[id] };
+    return { id: id, name: pName(products[id]), price: Number(products[id].price) || 0, qty: cart[id] };
   });
   const total = cartTotal();
   orderBtn.disabled = true;
@@ -186,11 +204,11 @@ orderBtn.onclick = async function () {
   statusEl.textContent = "جاري إرسال الطلب...";
   try {
     await addDoc(collection(db, "orders"), {
-      name: name, phone: phone, address: address,
+      customerName: customerName, phone: phone, address: address,
       items: items, total: total,
       status: "new", createdAt: serverTimestamp()
     });
-    let msg = "طلب جديد من EgyStors\n\nالاسم: " + name + "\nالتليفون: " + phone + "\nالعنوان: " + address + "\n\n";
+    let msg = "طلب جديد من EgyStors\n\nالاسم: " + customerName + "\nالتليفون: " + phone + "\nالعنوان: " + address + "\n\n";
     items.forEach(function (i) { msg += "- " + i.name + " × " + i.qty + " = " + (i.price * i.qty) + " جنيه\n"; });
     msg += "\nالإجمالي: " + total + " جنيه";
     const link = "https://wa.me/" + STORE_WHATSAPP + "?text=" + encodeURIComponent(msg);
