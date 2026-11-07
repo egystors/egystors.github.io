@@ -1,1 +1,78 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>إدارة EgyStors</title>
+  <style>
+    :root { --navy:#0b2a5b; --navy2:#123c82; --gold:#c9a227; --silver:#c8ccd4; --bg:#f4f7fb; --red:#c0392b; --green:#1e8449; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Tahoma, Arial, sans-serif; background: var(--bg); color: #1b2333; padding-bottom: 40px; }
+    header { background: linear-gradient(135deg, var(--navy), var(--navy2)); border-bottom: 3px solid var(--gold); padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; }
+    header h1 { font-size: 20px; color: var(--gold); }
+    #logoutBtn { background: none; border: 1px solid var(--gold); color: var(--gold); padding: 6px 14px; border-radius: 18px; font-family: inherit; cursor: pointer; display: none; }
+    main { max-width: 900px; margin: 14px auto; padding: 0 10px; }
+    .box { background: #fff; border: 1px solid var(--silver); border-radius: 14px; padding: 14px; margin-bottom: 14px; }
+    .box h2 { color: var(--navy); font-size: 18px; margin-bottom: 10px; }
+    input, select { width: 100%; padding: 11px; margin-bottom: 8px; border: 1px solid var(--silver); border-radius: 10px; font-size: 15px; font-family: inherit; background: #fff; }
+    button.main { width: 100%; background: var(--navy); color: var(--gold); border: none; padding: 12px; border-radius: 10px; font-size: 16px; font-weight: bold; font-family: inherit; cursor: pointer; }
+    button.main:disabled { background: #aab0bd; color: #fff; }
+    button.gray { width: 100%; background: #e6e9ef; color: var(--navy); border: none; padding: 10px; border-radius: 10px; font-size: 15px; font-family: inherit; cursor: pointer; margin-top: 6px; }
+    #loginMsg, #formMsg, #listMsg { margin-top: 8px; text-align: center; font-weight: bold; }
+    #app { display: none; }
+    .prod { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid #e8ebf1; }
+    .prod .t { font-weight: bold; color: var(--navy); }
+    .prod .s { font-size: 13px; color: #6b7385; }
+    .prod .btns { display: flex; gap: 6px; flex: none; }
+    .prod .btns button { border: none; padding: 8px 12px; border-radius: 8px; font-family: inherit; font-size: 14px; cursor: pointer; }
+    .edit { background: var(--gold); color: var(--navy); }
+    .del { background: var(--red); color: #fff; }
+    label { display: block; font-size: 13px; color: #6b7385; margin-bottom: 3px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>إدارة EgyStors</h1>
+    <button id="logoutBtn">تسجيل خروج</button>
+  </header>
 
+  <main>
+    <div class="box" id="loginBox">
+      <h2>تسجيل الدخول</h2>
+      <input id="email" type="email" placeholder="الإيميل" autocomplete="username">
+      <input id="password" type="password" placeholder="الباسورد" autocomplete="current-password">
+      <button class="main" id="loginBtn">دخول</button>
+      <div id="loginMsg"></div>
+    </div>
+
+    <div id="app">
+      <div class="box">
+        <h2 id="formTitle">إضافة منتج</h2>
+        <label>اسم المنتج</label>
+        <input id="pName" placeholder="مثال: T-shirt">
+        <label>القسم</label>
+        <select id="pCategory"></select>
+        <input id="pNewCat" placeholder="أو اكتب اسم قسم جديد (اختياري)">
+        <label>السعر بالجنيه</label>
+        <input id="pPrice" type="number" inputmode="decimal" placeholder="250">
+        <label>الكمية المتاحة</label>
+        <input id="pStock" type="number" inputmode="numeric" placeholder="10">
+        <label>رابط الصورة</label>
+        <input id="pImage" type="url" placeholder="https://...">
+        <button class="main" id="saveBtn">حفظ المنتج</button>
+        <button class="gray" id="cancelBtn" style="display:none">إلغاء التعديل</button>
+        <div id="formMsg"></div>
+      </div>
+
+      <div class="box">
+        <h2>المنتجات</h2>
+        <div id="list"></div>
+        <div id="listMsg"></div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module" src="admin.js"></script>
+</body>
+</html>
